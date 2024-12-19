@@ -1,0 +1,35 @@
+# Python
+# Ignore Python bytecode files
+*.pyc
+*.pyo
+__pycache__/
+
+# Django
+# Ignore the SQLite database file (not needed in version control)
+db.sqlite3
+
+# Ignore media folder (user-uploaded files, should not be tracked)
+media/
+
+# Environment files
+# Ignore environment variable file that contains sensitive information (e.g., SECRET_KEY)
+.env
+
+# Virtual Environment
+# Ignore virtual environment folders (venv, env) as they can be recreated easily
+venv/
+env/
+
+# Node.js (if applicable)
+# Ignore Node.js dependencies directory
+node_modules/
+
+# IDEs (e.g., PyCharm, VSCode)
+# Ignore IDE configuration files and folders
+.idea/
+.vscode/
+
+# Miscellaneous
+# Ignore any temporary files or other system-specific files
+.DS_Store
+*.log
