@@ -5,10 +5,9 @@ from .models import CustomUser
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'password',
-                  'avatar', 'isTermsAccepted', 'isOnline']
+        fields = ['id', 'username', 'email', 'password', 'uploaded_avatar', 'selected_avatar']
         extra_kwargs = {'password': {'write_only': True}}
 
-        def create(self, validata_data):
-            user = CustomUser.objects.create_user(**validata_data)
-            return user
+    def create(self, validated_data):
+        user = CustomUser.objects.create_user(**validated_data)
+        return user
