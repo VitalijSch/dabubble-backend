@@ -12,8 +12,8 @@ class CreateUserView(generics.CreateAPIView):
 
 
 class CheckEmailExistsView(APIView):
-    def get(self, request):
-        email = request.query_params.get('email')
+    def post(self, request):
+        email = request.data.get('email')
         if not email:
             return Response({'error': 'The email parameter is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -56,15 +56,48 @@ class SendPasswordResetEmailView(APIView):
 class DeletePasswordResetEmailView(APIView):
     def post(self, request):
         email_token = request.data.get('token')
-        print(email_token)
         if not email_token:
             return Response({'error': 'Token is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            token = PasswordResetToken.objects.get(token=email_token)
+            email = PasswordResetToken.objects.get(token=email_token)
         except PasswordResetToken.DoesNotExist:
             return Response({'error': 'Token not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        token.delete()
+        email.delete()
 
         return Response({'message': 'Token deleted successfully'}, status=status.HTTP_200_OK)
+
+
+class GetPasswordResetEmailView(APIView):
+    def get(self, request):
+        token = request.query_params.get('token')
+
+        if not token:
+            return Response({'error': 'Token is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            email = PasswordResetToken.objects.get(token=token)
+        except PasswordResetToken.DoesNotExist:
+            return Response({'error': 'Token not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({'email': email.email})
+
+
+class ChangePasswordView(APIView):
+    def post(self, request):
+        new_password = request.data.get('newPassword')
+        user_email = request.data.get('email')
+
+        if not new_password or not user_email:
+            return Response({'error': 'New Password or email is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = CustomUser.objects.get(email=user_email)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'User with this email does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
