@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
-from .models import CustomUser
+from .models import CustomUser, PasswordResetToken
 from .serializers import UserSerializer, SendPasswordResetEmailSerializer
 from django.core.mail import send_mail
 
@@ -27,12 +27,14 @@ class SendPasswordResetEmailView(APIView):
         if not user_email:
             return Response({'email': 'The email parameter is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = SendPasswordResetEmailSerializer(data={'email': user_email})
+        serializer = SendPasswordResetEmailSerializer(
+            data={'email': user_email})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         reset_token = serializer.save()
-        reset_url = f'http://localhost:4200/auth/reset-password/{serializer.data['token']}'
+        reset_url = f'http://localhost:4200/auth/reset-password/{
+            serializer.data['token']}'
         message = (
             f'Hallo,\n\n'
             f'Wir haben eine Anfrage zum Zurücksetzen deines Passworts erhalten. '
@@ -49,3 +51,20 @@ class SendPasswordResetEmailView(APIView):
         )
 
         return Response({'message': 'Email sent successfully!', 'token': reset_token.token}, status=status.HTTP_200_OK)
+
+
+class DeletePasswordResetEmailView(APIView):
+    def post(self, request):
+        email_token = request.data.get('token')
+        print(email_token)
+        if not email_token:
+            return Response({'error': 'Token is missing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            token = PasswordResetToken.objects.get(token=email_token)
+        except PasswordResetToken.DoesNotExist:
+            return Response({'error': 'Token not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        token.delete()
+
+        return Response({'message': 'Token deleted successfully'}, status=status.HTTP_200_OK)
