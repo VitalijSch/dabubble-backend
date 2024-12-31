@@ -1,9 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser, PasswordResetToken
 from .serializers import UserSerializer, SendPasswordResetEmailSerializer
 from django.core.mail import send_mail
+from django.contrib.auth.hashers import check_password
 
 
 class CreateUserView(generics.CreateAPIView):
@@ -14,6 +17,7 @@ class CreateUserView(generics.CreateAPIView):
 class CheckEmailExistsView(APIView):
     def post(self, request):
         email = request.data.get('email')
+
         if not email:
             return Response({'error': 'The email parameter is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -24,6 +28,7 @@ class CheckEmailExistsView(APIView):
 class SendPasswordResetEmailView(APIView):
     def post(self, request):
         user_email = request.data.get('email')
+
         if not user_email:
             return Response({'email': 'The email parameter is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -56,6 +61,7 @@ class SendPasswordResetEmailView(APIView):
 class DeletePasswordResetEmailView(APIView):
     def post(self, request):
         email_token = request.data.get('token')
+
         if not email_token:
             return Response({'error': 'Token is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -101,3 +107,29 @@ class ChangePasswordView(APIView):
         user.save()
 
         return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
+
+
+class UserLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not email or not password:
+            return Response({'error': 'E-Mail oder Passwort fehlt.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = CustomUser.objects.get(email=email)
+
+            if check_password(password, user.password):
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Ungültiges Passwort.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'Benutzer mit dieser E-Mail existiert nicht.'}, status=status.HTTP_404_NOT_FOUND)
