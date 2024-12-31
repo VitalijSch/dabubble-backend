@@ -10,4 +10,5 @@ urlpatterns = [
     path('get-reset-email/', views.GetPasswordResetEmailView.as_view(), name='get-reset-email'),
     path('change-reset-password/', views.ChangePasswordView.as_view(), name='change-reset-password'),
     path('login-user/', views.UserLoginView.as_view(), name='login-user'),
+    path('login-guest/', views.GuestLoginView.as_view(), name='login-guest'),
 ]

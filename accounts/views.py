@@ -7,6 +7,7 @@ from .models import CustomUser, PasswordResetToken
 from .serializers import UserSerializer, SendPasswordResetEmailSerializer
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import check_password
+from django.contrib.auth.models import User
 
 
 class CreateUserView(generics.CreateAPIView):
@@ -133,3 +134,28 @@ class UserLoginView(APIView):
 
         except CustomUser.DoesNotExist:
             return Response({'error': 'Benutzer mit dieser E-Mail existiert nicht.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class GuestLoginView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        guest_user = self.create_guest_user()
+
+        refresh = RefreshToken.for_user(guest_user)
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        }, status=status.HTTP_200_OK)
+
+    def create_guest_user(self):
+        guest_user_data = {
+            'id': None,
+            'username': 'guest_user',
+            'email': 'guest@example.com',
+        }
+
+        guest_user = User(**guest_user_data)
+
+        return guest_user
