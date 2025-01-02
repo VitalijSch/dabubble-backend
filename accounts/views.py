@@ -4,11 +4,12 @@ from rest_framework import status, generics
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser, PasswordResetToken
-from .serializers import UserSerializer, SendPasswordResetEmailSerializer
-from django.core.mail import send_mail
+from .serializers import UserSerializer
+from django.forms import ValidationError
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import User
 from .services.email_service import email_exists
+from .services.password_reset_service import PasswordResetService
 
 
 class CreateUserView(generics.CreateAPIView):
@@ -26,8 +27,13 @@ class CheckEmailExistsView(APIView):
         if not email:
             return self.error_response('The email parameter is missing.', status.HTTP_400_BAD_REQUEST)
 
-        exists = email_exists(email)
-        return Response({'exists': exists}, status=status.HTTP_200_OK)
+        try:
+            is_email_exist = email_exists(email)
+            return Response({'isEmailExist': is_email_exist}, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def error_response(self, message, status_code):
         return Response({'error': message}, status=status_code)
@@ -37,44 +43,18 @@ class SendPasswordResetEmailView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        user_email = request.data.get('email')
+        email = request.data.get('email')
 
-        if not user_email:
+        if not email:
             return self.error_response('The email parameter is missing.', status.HTTP_400_BAD_REQUEST)
 
-        serializer = self.validate_email(user_email)
-        if not serializer:
-            return self.error_response('Invalid email.', status.HTTP_400_BAD_REQUEST)
-
-        reset_token = self.create_reset_token(serializer)
-        self.send_reset_email(user_email, serializer.data['token'])
-
-        return Response({'message': 'Email sent successfully!', 'token': reset_token.token}, status=status.HTTP_200_OK)
-
-    def validate_email(self, email):
-        serializer = SendPasswordResetEmailSerializer(data={'email': email})
-        if serializer.is_valid():
-            return serializer
-        return None
-
-    def create_reset_token(self, serializer):
-        return serializer.save()
-
-    def send_reset_email(self, email, token):
-        reset_url = f'http://localhost:4200/auth/reset-password/{token}'
-        message = (
-            f'Hallo,\n\n'
-            f'Wir haben eine Anfrage zum Zurücksetzen deines Passworts erhalten. '
-            f'Klicke hier, um dein Passwort zurückzusetzen:\n{reset_url}\n\n'
-            f'Ignoriere diese E-Mail, falls du die Anfrage nicht gestellt hast.\n\n'
-            f'Beste Grüße,\nDein DABubble Team!'
-        )
-        send_mail(
-            subject='Passwort zurücksetzen',
-            message=message,
-            from_email='mail@vitalij-schwab.com',
-            recipient_list=[email],
-        )
+        try:
+            PasswordResetService().process_password_reset(email)
+            return Response({'message': 'Email sent successfully!'}, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def error_response(self, message, status_code):
         return Response({'error': message}, status=status_code)
