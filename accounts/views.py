@@ -1,7 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 from .serializers import UserSerializer
 from django.forms import ValidationError
@@ -104,7 +106,8 @@ class ChangePasswordView(APIView):
             return self.error_response('New Password or email is missing.', status.HTTP_400_BAD_REQUEST)
 
         try:
-            PasswordChangeService.change_user_password(user_email, new_password)
+            PasswordChangeService.change_user_password(
+                user_email, new_password)
             return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
         except ValueError as e:
             return self.error_response(str(e), status.HTTP_404_NOT_FOUND)
@@ -113,52 +116,6 @@ class ChangePasswordView(APIView):
 
     def error_response(self, message, status_code):
         return Response({'error': message}, status=status_code)
-
-
-class UserLoginView(APIView):
-
-    def post(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-        if not email or not password:
-            return self.error_response('E-Mail oder Passwort fehlt.', status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user = UserLoginService.authenticate_user(email, password)
-            if user is None:
-                raise ValueError('Ungültige E-Mail oder Passwort.')
-
-            user.is_online = True
-            user.save()
-
-            tokens = UserLoginService.generate_tokens(user)
-            user_data = UserLoginService.get_serialized_user_data(user)
-
-            response = Response({
-                'access': tokens['access'],
-                'refresh': tokens['refresh'],
-                'user': user_data,
-            }, status=status.HTTP_200_OK)
-
-            response.set_cookie(
-                key='access',
-                value=tokens['access'],
-                httponly=True,
-                secure=True,
-                samesite='None',
-            )
-
-            return response
-        except ValueError as e:
-            return self.error_response(str(e), status.HTTP_401_UNAUTHORIZED)
-        except Exception as e:
-            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    def error_response(self, message, status_code):
-        return Response({'error': message}, status=status_code)
-
-
-class UserCheckView(APIView):
 
     def get(self, request):
         token = request.COOKIES.get('access')
@@ -175,27 +132,6 @@ class UserCheckView(APIView):
             return Response({'authenticated': False}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-class UserLogoutView(APIView):
-
-    def post(self, request):
-        token = request.COOKIES.get('access')
-        if not token:
-            return Response({'authenticated': False}, status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            decoded_token = AccessToken(token)
-            user_id = decoded_token['user_id']
-            user = CustomUser.objects.get(id=user_id)
-            user.is_online = False
-            user.save()
-
-            response = Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
-            response.delete_cookie('access', samesite='None')
-            return response
-        except Exception as e:
-            return Response({'authenticated': False, 'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
-
-
 class GuestLoginView(APIView):
 
     def get(self, request):
@@ -208,3 +144,80 @@ class GuestLoginView(APIView):
             'refresh': str(refresh),
             'user': guest_data,
         }, status=status.HTTP_200_OK)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        tokens = response.data
+
+        try:
+            email = request.data.get('email')
+            user = CustomUser.objects.get(email=email)
+            user.is_online = True
+            user.save()
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'Benutzer nicht gefunden'}, status=404)
+
+        response.set_cookie(
+            key='access',
+            value=tokens['access'],
+            httponly=True,
+            secure=True,
+            samesite='None',
+        )
+
+        response.set_cookie(
+            key='refresh',
+            value=tokens['refresh'],
+            httponly=True,
+            secure=True,
+            samesite='None',
+        )
+
+        user_data = UserLoginService.get_serialized_user_data(user)
+
+        response.data = {'user': user_data}
+
+        return response
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.COOKIES.get('refresh')
+        if not refresh_token:
+            return Response({'error': 'Refresh token fehlt'}, status=401)
+
+        try:
+            token = RefreshToken(refresh_token)
+            new_access_token = str(token.access_token)
+
+            decoded_token = AccessToken(new_access_token)
+            user_id = decoded_token['user_id']
+            user = CustomUser.objects.get(id=user_id)
+            user_data = UserLoginService.get_serialized_user_data(user)
+
+            response = Response(
+                {'user': user_data}, status=status.HTTP_200_OK)
+            response.set_cookie(
+                key='access',
+                value=new_access_token,
+                httponly=True,
+                secure=True,
+                samesite='None',
+            )
+            return response
+        except Exception as e:
+            return Response({'error': 'Ungültiger Refresh Token'}, status=401)
+
+
+class UserLogoutView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        response = Response({'message': 'Logout erfolgreich'})
+        response.delete_cookie('access', samesite='None')
+        response.delete_cookie('refresh', samesite='None')
+
+        return response
