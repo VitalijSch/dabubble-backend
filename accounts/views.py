@@ -213,6 +213,18 @@ class CustomTokenRefreshView(TokenRefreshView):
             return Response({'error': 'Ungültiger Refresh Token'}, status=401)
 
 
+class UserUpdateView(APIView):
+
+    def put(self, request):
+        user_id = request.data.get('id')
+        user = CustomUser.objects.get(id=user_id)
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserLogoutView(APIView):
 
     def post(self, request, *args, **kwargs):
