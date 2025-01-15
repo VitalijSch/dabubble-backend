@@ -161,7 +161,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return Response({'error': 'Benutzer nicht gefunden'}, status=404)
 
         response.set_cookie(
-            key='access',
+            key=f'access_{user.id}',
             value=tokens['access'],
             httponly=True,
             secure=True,
@@ -169,7 +169,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         )
 
         response.set_cookie(
-            key='refresh',
+            key=f'refresh_{user.id}',
             value=tokens['refresh'],
             httponly=True,
             secure=True,
@@ -186,7 +186,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class CustomTokenRefreshView(TokenRefreshView):
 
     def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get('refresh')
+        user_id = request.data.get('id')
+        refresh_token = request.COOKIES.get(f'refresh_{user_id}',)
+        print(refresh_token)
         if not refresh_token:
             return Response({'error': 'Refresh token fehlt'}, status=401)
 
@@ -199,10 +201,9 @@ class CustomTokenRefreshView(TokenRefreshView):
             user = CustomUser.objects.get(id=user_id)
             user_data = UserLoginService.get_serialized_user_data(user)
 
-            response = Response(
-                {'user': user_data}, status=status.HTTP_200_OK)
+            response = Response({'user': user_data}, status=status.HTTP_200_OK)
             response.set_cookie(
-                key='access',
+                key=f'access_{user.id}',
                 value=new_access_token,
                 httponly=True,
                 secure=True,
@@ -225,11 +226,23 @@ class UserUpdateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class UserListView(APIView):
+
+    def get(self, request):
+        users = CustomUser.objects.filter(is_superuser=False)
+        serializer = UserSerializer(users, many=True)
+        return Response({'users': serializer.data})
+
+
 class UserLogoutView(APIView):
 
     def post(self, request, *args, **kwargs):
+        user_id = request.data.get('id')
+        user = CustomUser.objects.get(id=user_id)
+        user.is_online = False
+        user.save()
         response = Response({'message': 'Logout erfolgreich'})
-        response.delete_cookie('access', samesite='None')
-        response.delete_cookie('refresh', samesite='None')
+        response.delete_cookie(f'access_{user_id}', samesite='None')
+        response.delete_cookie(f'refresh_{user_id}', samesite='None')
 
         return response
