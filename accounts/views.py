@@ -1,165 +1,206 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics
+from rest_framework import status
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
-from .serializers import UserSerializer
+from .serializers import UserSerializer, SendPasswordResetEmailSerializer, PasswordResetToken
 from django.forms import ValidationError
-from .services.email_service import EmailService
-from .services.password_reset_service import PasswordResetService
-from .services.password_reset_token_service import PasswordResetTokenService
-from .services.password_change_service import PasswordChangeService
-from .services.user_login_service import UserLoginService
-from .services.guest_login_service import GuestLoginService
+from django.core.mail import EmailMessage
 
 
-class CreateUserView(generics.CreateAPIView):
-    queryset = CustomUser.objects.all()
-    serializer_class = UserSerializer
+class UserCreateView(APIView):
+
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            serializer.save()
+            return Response({'message': 'User created successfully!'}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CheckEmailExistsView(APIView):
 
     def post(self, request):
         email = request.data.get('email')
+
         if not email:
-            return self.error_response('The email parameter is missing.', status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Email parameter is missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            is_email_exist = EmailService.email_exists(email)
+            is_email_exist = CustomUser.objects.filter(email=email).exists()
             return Response({'isEmailExist': is_email_exist}, status=status.HTTP_200_OK)
-        except ValidationError as e:
-            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    def error_response(self, message, status_code):
-        return Response({'error': message}, status=status_code)
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class SendPasswordResetEmailView(APIView):
 
     def post(self, request):
-        email = request.data.get('email')
-        if not email:
-            return self.error_response('The email parameter is missing.', status.HTTP_400_BAD_REQUEST)
+        email_object = request.data
+
+        if not email_object:
+            return Response({'error': 'Email parameter is missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            PasswordResetService().process_password_reset(email)
+            self.process_password_reset(email_object)
             return Response({'message': 'Email sent successfully!'}, status=status.HTTP_200_OK)
-        except ValidationError as e:
-            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def error_response(self, message, status_code):
-        return Response({'error': message}, status=status_code)
+    def process_password_reset(self, email_object):
+        token = self.create_token(email_object)
+        self.send_reset_email(email_object, token)
+
+    @staticmethod
+    def create_token(email_object):
+        serializer = SendPasswordResetEmailSerializer(data=email_object)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+        serializer.save()
+        return serializer.data['token']
+
+    @staticmethod
+    def send_reset_email(email_object, token):
+        subject = 'Passwort zurücksetzen'
+        body = (
+            f'Hallo,\n\n'
+            f'Wir haben eine Anfrage zum Zurücksetzen deines Passworts erhalten. '
+            f'Klicke hier, um dein Passwort zurückzusetzen:\nhttp://localhost:4200/auth/reset-password/{
+                token}\n\n'
+            f'Ignoriere diese E-Mail, falls du die Anfrage nicht gestellt hast.\n\n'
+            f'Beste Grüße,\nDein DABubble Team!'
+        )
+        from_email = 'mail@vitalij-schwab.com'
+
+        email_message = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=from_email,
+            to=[email_object['email']]
+        )
+
+        email_message.send()
 
 
 class DeletePasswordResetEmailView(APIView):
 
     def post(self, request):
-        email_token = request.data.get('token')
-        if not email_token:
-            return self.error_response('Token is missing.', status.HTTP_400_BAD_REQUEST)
+        token_object = request.data
+
+        if not token_object:
+            return Response({'error': 'Token parameter is missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            token_object = PasswordResetTokenService.get_token(email_token)
-            PasswordResetTokenService.delete_token(token_object)
+            self.process_delete_password_reset(token_object)
             return Response({'message': 'Token deleted successfully'}, status=status.HTTP_200_OK)
-        except ValidationError as e:
-            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def error_response(self, message, status_code):
-        return Response({'error': message}, status=status_code)
+    def process_delete_password_reset(self, token_object):
+        token = self.get_token(token_object)
+        self.delete_token(token)
+
+    @staticmethod
+    def get_token(token_object):
+        return PasswordResetToken.objects.get(token=token_object['token'])
+
+    @staticmethod
+    def delete_token(token):
+        token.delete()
 
 
 class GetPasswordResetEmailView(APIView):
 
     def get(self, request):
         token = request.query_params.get('token')
+
         if not token:
-            return self.error_response('Token is missing.', status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Token parameter is missing'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            email = PasswordResetTokenService.get_token(token)
+            email = self.get_token(token)
             return Response({'email': email.email})
-        except ValidationError as e:
-            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def error_response(self, message, status_code):
-        return Response({'error': message}, status=status_code)
+    @staticmethod
+    def get_token(token):
+        return PasswordResetToken.objects.get(token=token)
 
 
 class ChangePasswordView(APIView):
 
     def post(self, request):
-        new_password = request.data.get('newPassword')
-        user_email = request.data.get('email')
-        if not new_password or not user_email:
-            return self.error_response('New Password or email is missing.', status.HTTP_400_BAD_REQUEST)
+        user_data = request.data
+        if not user_data:
+            return Response({'error': 'New Password or email is missing.'}, status.HTTP_400_BAD_REQUEST)
 
         try:
-            PasswordChangeService.change_user_password(
-                user_email, new_password)
+            self.change_user_password(user_data)
             return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
-        except ValueError as e:
-            return self.error_response(str(e), status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return self.error_response('An error occurred while processing the request.', status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def error_response(self, message, status_code):
-        return Response({'error': message}, status=status_code)
+    def change_user_password(self, user_data):
+        user = self.get_user_by_email(user_data['email'])
+        if not user:
+            raise ValueError('User with this email does not exist.')
+        self.update_user_password(user, user_data['newPassword'])
 
-    def get(self, request):
-        token = request.COOKIES.get('access')
-        if not token:
-            return Response({'authenticated': False}, status=status.HTTP_401_UNAUTHORIZED)
+    @staticmethod
+    def get_user_by_email(email):
+        return CustomUser.objects.get(email=email)
 
-        try:
-            decoded_token = AccessToken(token)
-            user_id = decoded_token['user_id']
-            user = CustomUser.objects.get(id=user_id)
-            user_data = UserLoginService.get_serialized_user_data(user)
-            return Response({'authenticated': True, 'user': user_data}, status=status.HTTP_200_OK)
-        except Exception:
-            return Response({'authenticated': False}, status=status.HTTP_401_UNAUTHORIZED)
+    @staticmethod
+    def update_user_password(user, new_password):
+        user.set_password(new_password)
+        user.save()
 
 
 class GuestLoginView(APIView):
-
-    def get(self, request):
-        guest_user = GuestLoginService.create_guest_user()
-        refresh = GuestLoginService.generate_refresh_token(guest_user)
-        guest_data = GuestLoginService.get_serialized_guest_data(guest_user)
-
-        return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
-            'user': guest_data,
-        }, status=status.HTTP_200_OK)
+    pass
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
 
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        tokens = response.data
+    def post(self, request):
+        tokens = self.generate_tokens(request)
 
         try:
-            email = request.data.get('email')
-            user = CustomUser.objects.get(email=email)
-            user.is_online = True
-            user.save()
-        except CustomUser.DoesNotExist:
-            return Response({'error': 'Benutzer nicht gefunden'}, status=404)
+            return self.handle_request(request, tokens)
+        except Exception as e:
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def generate_tokens(self, request):
+        response = super().post(request)
+        return response.data
+
+    def handle_request(self, request, tokens):
+        user = self.get_user_by_email(request.data.get('email'))
+        self.update_user_status(user, is_online=True)
+        response_with_cookies = self.add_tokens_to_response_cookies(
+            user, tokens)
+        return self.prepare_response(user, response_with_cookies)
+
+    @staticmethod
+    def get_user_by_email(email):
+        return CustomUser.objects.get(email=email)
+
+    @staticmethod
+    def update_user_status(user, is_online):
+        user.is_online = is_online
+        user.save()
+
+    @staticmethod
+    def add_tokens_to_response_cookies(user, tokens):
+        response = Response()
         response.set_cookie(
             key=f'access_{user.id}',
             value=tokens['access'],
@@ -167,7 +208,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             secure=True,
             samesite='None',
         )
-
         response.set_cookie(
             key=f'refresh_{user.id}',
             value=tokens['refresh'],
@@ -175,74 +215,131 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             secure=True,
             samesite='None',
         )
-
-        user_data = UserLoginService.get_serialized_user_data(user)
-
-        response.data = {'user': user_data}
-
         return response
+
+    @staticmethod
+    def prepare_response(user, response_with_cookies):
+        serialized_user = UserSerializer(user)
+        response_with_cookies.data = {'user': serialized_user.data}
+        return response_with_cookies
 
 
 class CustomTokenRefreshView(TokenRefreshView):
 
-    def post(self, request, *args, **kwargs):
-        user_id = request.data.get('id')
-        refresh_token = request.COOKIES.get(f'refresh_{user_id}',)
-        print(refresh_token)
-        if not refresh_token:
-            return Response({'error': 'Refresh token fehlt'}, status=401)
-
+    def post(self, request):
         try:
-            token = RefreshToken(refresh_token)
-            new_access_token = str(token.access_token)
-
-            decoded_token = AccessToken(new_access_token)
-            user_id = decoded_token['user_id']
-            user = CustomUser.objects.get(id=user_id)
-            user_data = UserLoginService.get_serialized_user_data(user)
-
-            response = Response({'user': user_data}, status=status.HTTP_200_OK)
-            response.set_cookie(
-                key=f'access_{user.id}',
-                value=new_access_token,
-                httponly=True,
-                secure=True,
-                samesite='None',
-            )
-            return response
+            refresh_token = self.get_refresh_token_from_cookies(request)
+            new_access_token = self.create_new_access_token(refresh_token)
+            user = self.get_user_from_token(new_access_token)
+            return self.prepare_response(user, new_access_token)
         except Exception as e:
-            return Response({'error': 'Ungültiger Refresh Token'}, status=401)
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @staticmethod
+    def get_refresh_token_from_cookies(request):
+        user_id = request.data.get('id')
+        refresh_token = request.COOKIES.get(f'refresh_{user_id}')
+        return refresh_token
+
+    @staticmethod
+    def create_new_access_token(refresh_token):
+        token = RefreshToken(refresh_token)
+        return str(token.access_token)
+
+    @staticmethod
+    def get_user_from_token(access_token):
+        decoded_token = AccessToken(access_token)
+        user_id = decoded_token['user_id']
+        return CustomUser.objects.get(id=user_id)
+
+    def prepare_response(self, user, access_token):
+        serialized_user = UserSerializer(user)
+        response = Response({'user': serialized_user.data},
+                            status=status.HTTP_200_OK)
+        self.set_access_cookie(response, user.id, access_token)
+        return response
+
+    @staticmethod
+    def set_access_cookie(response, user_id, access_token):
+        response.set_cookie(
+            key=f'access_{user_id}',
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite='None',
+        )
 
 
 class UserUpdateView(APIView):
 
     def put(self, request):
-        user_id = request.data.get('id')
-        user = CustomUser.objects.get(id=user_id)
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
+        try:
+            user = self.get_user_by_id(request.data.get('id'))
+            serializer = self.get_serializer(user, request.data)
+            self.update_user_if_valid(serializer)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @staticmethod
+    def get_user_by_id(user_id):
+        if not user_id:
+            raise ValueError('User ID is required.')
+        return CustomUser.objects.get(id=user_id)
+
+    @staticmethod
+    def get_serializer(user, data):
+        print(data)
+        return UserSerializer(user, data=data, partial=True)
+
+    @staticmethod
+    def update_user_if_valid(serializer):
+        if not serializer.is_valid():
+            raise ValueError(serializer.errors)
+        serializer.save()
 
 
 class UserListView(APIView):
 
     def get(self, request):
-        users = CustomUser.objects.filter(is_superuser=False)
-        serializer = UserSerializer(users, many=True)
-        return Response({'users': serializer.data})
+        users = self.get_non_superusers()
+        serialized_users = self.serialize_users(users)
+        return Response({'users': serialized_users}, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def get_non_superusers():
+        return CustomUser.objects.filter(is_superuser=False)
+
+    @staticmethod
+    def serialize_users(users):
+        return UserSerializer(users, many=True).data
 
 
 class UserLogoutView(APIView):
 
     def post(self, request, *args, **kwargs):
-        user_id = request.data.get('id')
-        user = CustomUser.objects.get(id=user_id)
+        try:
+            user = self.get_user_by_id(request.data.get('id'))
+            self.logout_user(user)
+            response = self.create_success_response(user.id)
+            return response
+        except Exception as e:
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @staticmethod
+    def get_user_by_id(user_id):
+        if not user_id:
+            raise ValueError('User ID is required.')
+        return CustomUser.objects.get(id=user_id)
+
+    @staticmethod
+    def logout_user(user):
         user.is_online = False
         user.save()
+
+    @staticmethod
+    def create_success_response(user_id):
         response = Response({'message': 'Logout erfolgreich'})
         response.delete_cookie(f'access_{user_id}', samesite='None')
         response.delete_cookie(f'refresh_{user_id}', samesite='None')
-
         return response
