@@ -7,7 +7,7 @@ class CustomChannel(models.Model):
     description = models.CharField(max_length=255, blank=True, null=True)
     creator = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, related_name="created_channels")
-    members = models.ManyToManyField(
+    membersPk = models.ManyToManyField(
         CustomUser, related_name="channels", blank=True)
 
     def __str__(self):

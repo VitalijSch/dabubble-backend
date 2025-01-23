@@ -339,7 +339,7 @@ class UserLogoutView(APIView):
 
     @staticmethod
     def create_success_response(user_id):
-        response = Response({'message': 'Logout erfolgreich'})
+        response = Response({'message': 'Logout successfully'})
         response.delete_cookie(f'access_{user_id}', samesite='None')
         response.delete_cookie(f'refresh_{user_id}', samesite='None')
         return response
