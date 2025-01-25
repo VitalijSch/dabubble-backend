@@ -5,4 +5,4 @@ from .models import CustomChannel
 class ChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomChannel
-        fields = ['name', 'creator', 'description', 'membersPk']
+        fields = ['id', 'name', 'creator', 'description', 'membersPk']
