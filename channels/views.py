@@ -6,7 +6,7 @@ from .serializers import ChannelSerializer
 from accounts.models import CustomUser
 
 
-class CreateChannelView(APIView):
+class ChannelCreateView(APIView):
 
     def post(self, request):
         try:
@@ -22,9 +22,9 @@ class CreateChannelView(APIView):
             raise ValueError(serializer.errors)
         serializer.save()
         channels = self.get_all_channels()
-        serializer =  ChannelSerializer(channels, many=True)
+        serializer = ChannelSerializer(channels, many=True)
         return serializer
-    
+
     @staticmethod
     def get_creator(request):
         creator = CustomUser.objects.get(id=request['creator'])
@@ -35,7 +35,7 @@ class CreateChannelView(APIView):
     def get_all_channels():
         channels = CustomChannel.objects.all()
         return channels
-    
+
 
 class ChannelListView(APIView):
 
@@ -43,6 +43,20 @@ class ChannelListView(APIView):
         try:
             channels = CustomChannel.objects.all()
             serializer = ChannelSerializer(channels, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChannelUpdateView(APIView):
+
+    def put(self, request):
+        try:
+            channel = CustomChannel.objects.get(id=request.data.get('id'))
+            serializer = ChannelSerializer(channel, data=request.data)
+            if not serializer.is_valid():
+                raise ValueError(serializer.errors)
+            serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'An error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
