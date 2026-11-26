@@ -36,6 +36,9 @@ SECURE_CSP = {
     "frame-ancestors": [CSP.NONE],
 }
 
+# --- Links in emails must point at the real frontend ---------------------------------------------
+FRONTEND_URL = env("FRONTEND_URL")
+
 # --- Email: real SMTP, the host is required ------------------------------------------------------
 MAILERS["default"]["OPTIONS"]["host"] = env("DJANGO_EMAIL_HOST")
 

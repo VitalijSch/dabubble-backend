@@ -9,10 +9,10 @@ pytestmark = pytest.mark.django_db
 
 
 def test_send_welcome_email() -> None:
-    user = UserFactory.create(email="new@example.com", first_name="Ada")
+    user = UserFactory.create(email="new@example.com", full_name="Ada Lovelace")
 
     send_welcome_email.enqueue(user.pk)  # runs immediately with the test task backend
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["new@example.com"]
-    assert "Hi Ada" in str(mail.outbox[0].body)
+    assert "Hi Ada Lovelace" in str(mail.outbox[0].body)

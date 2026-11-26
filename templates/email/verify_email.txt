@@ -1,0 +1,10 @@
+{% autoescape off %}Hi {{ user.full_name }},
+
+please confirm your email address to activate your DABubble account:
+
+{{ verify_url }}
+
+The link is valid for {{ valid_days }} days. If you didn't sign up for DABubble, you can ignore this email.
+
+— The DABubble team
+{% endautoescape %}
