@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import URLPattern, URLResolver, include, path
 
@@ -19,6 +20,11 @@ if settings.API_DOCS_ENABLED:
     ]
 
 if settings.DEBUG:
+    # Serve uploaded files (./media, e.g. avatars) from the dev server.
+    # Production stores them in Supabase Storage and returns signed URLs instead.
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
     from debug_toolbar.toolbar import debug_toolbar_urls
 
     urlpatterns += debug_toolbar_urls()
