@@ -1,5 +1,6 @@
-Hi{% if user.first_name %} {{ user.first_name }}{% endif %},
+{% autoescape off %}Hi {{ user.full_name }},
 
 welcome to DABubble! Your account for {{ user.email }} is ready.
 
 — The DABubble team
+{% endautoescape %}

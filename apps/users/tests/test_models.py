@@ -1,8 +1,9 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from apps.users.models import User
+from apps.users.models import DefaultAvatar, User
 
 from .factories import DEFAULT_PASSWORD, UserFactory
 
@@ -42,3 +43,25 @@ def test_factory_creates_user_with_password() -> None:
     user = UserFactory.create()
     assert user.pk is not None
     assert user.check_password(DEFAULT_PASSWORD)
+
+
+def test_user_needs_exactly_one_avatar() -> None:
+    with pytest.raises(IntegrityError):
+        UserFactory.create(default_avatar="")
+
+
+def test_user_cannot_have_two_avatars() -> None:
+    with pytest.raises(IntegrityError):
+        UserFactory.create(avatar="avatars/x.png", default_avatar=DefaultAvatar.AVATAR_1)
+
+
+def test_clean_reports_missing_avatar() -> None:
+    user = UserFactory.build(default_avatar="")
+    with pytest.raises(ValidationError) as exc_info:
+        user.clean()
+    assert "default_avatar" in exc_info.value.message_dict
+
+
+def test_create_superuser_gets_default_avatar() -> None:
+    admin = User.objects.create_superuser(email="root@example.com", password="s3cret-pass")
+    assert admin.default_avatar == DefaultAvatar.AVATAR_1

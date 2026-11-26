@@ -13,7 +13,7 @@ def test_me_requires_login() -> None:
 
 
 def test_me_returns_current_user() -> None:
-    user = UserFactory.create(email="me@example.com", first_name="Ada")
+    user = UserFactory.create(email="me@example.com", full_name="Ada Lovelace")
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -21,7 +21,7 @@ def test_me_returns_current_user() -> None:
 
     assert response.status_code == 200
     assert response.json()["email"] == "me@example.com"
-    assert response.json()["first_name"] == "Ada"
+    assert response.json()["full_name"] == "Ada Lovelace"
 
 
 def test_openapi_schema_is_served() -> None:

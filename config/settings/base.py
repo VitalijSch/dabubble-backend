@@ -76,8 +76,18 @@ TEMPLATES = [
     },
 ]
 
+# Argon2 for new passwords; the others still verify older hashes and upgrade them on login.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "OPTIONS": {"user_attributes": ("email", "full_name")},
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -98,6 +108,9 @@ STORAGES: dict[str, dict[str, Any]] = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+
+# Largest avatar image a user can upload.
+AVATAR_MAX_UPLOAD_SIZE = 2 * 1024 * 1024  # 2 MB
 
 ADMIN_URL = env("DJANGO_ADMIN_URL", default="admin/")
 
@@ -140,6 +153,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
+    # Rates for views that set `throttle_scope` (sign-up and email confirmation are public).
+    "DEFAULT_THROTTLE_RATES": {"register": "10/hour", "verify_email": "30/hour"},
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 SPECTACULAR_SETTINGS = {
@@ -152,6 +167,8 @@ SPECTACULAR_SETTINGS = {
 API_DOCS_ENABLED = env.bool("DJANGO_API_DOCS_ENABLED", default=False)
 
 # --- Frontend on another origin (Next.js) -------------------------------------------------------
+# Base URL for links in emails (e.g. the email confirmation link).
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 CORS_ALLOWED_ORIGINS = env.list("DJANGO_CORS_ALLOWED_ORIGINS", default=[])
 CORS_ALLOW_CREDENTIALS = True  # the frontend sends the session cookie
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
