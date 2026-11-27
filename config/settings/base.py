@@ -45,6 +45,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.EnglishAdminMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -93,7 +94,10 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-LANGUAGE_CODE = "en-us"
+# All texts users see are German, including Django's and DRF's built-in messages.
+# Code, comments and developer-facing messages stay English, and so does the admin
+# (see apps.core.middleware.EnglishAdminMiddleware).
+LANGUAGE_CODE = "de"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
@@ -111,6 +115,10 @@ STORAGES: dict[str, dict[str, Any]] = {
 
 # Largest avatar image a user can upload.
 AVATAR_MAX_UPLOAD_SIZE = 2 * 1024 * 1024  # 2 MB
+
+# Version of the privacy policy the frontend currently shows. Stored with each new user as proof
+# of which text they accepted. Change it whenever the policy text changes.
+PRIVACY_POLICY_VERSION = env("PRIVACY_POLICY_VERSION", default="2026-11-27")
 
 ADMIN_URL = env("DJANGO_ADMIN_URL", default="admin/")
 

@@ -60,7 +60,7 @@ class VerifyEmailView(APIView):
         serializer.is_valid(raise_exception=True)
         if services.verify_email(**serializer.validated_data) is None:
             return Response(
-                {"detail": "This link is invalid, expired or has already been used."},
+                {"detail": "Dieser Link ist ungültig, abgelaufen oder wurde bereits verwendet."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)

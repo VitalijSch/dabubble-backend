@@ -16,7 +16,7 @@ def send_welcome_email(user_id: int) -> None:
     """Send the welcome email in the background. Enqueue with `send_welcome_email.enqueue(id)`."""
     user = User.objects.get(pk=user_id)
     send_mail(
-        subject="Welcome to DABubble",
+        subject="Willkommen bei DABubble",
         message=render_to_string("email/welcome.txt", {"user": user}),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
@@ -35,7 +35,7 @@ def send_verification_email(user_id: int) -> None:
     )
     verify_url = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?{query}"
     send_mail(
-        subject="Confirm your DABubble email address",
+        subject="Bestätige deine E-Mail-Adresse für DABubble",
         message=render_to_string(
             "email/verify_email.txt",
             {

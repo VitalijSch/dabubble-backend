@@ -15,4 +15,5 @@ def test_send_welcome_email() -> None:
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["new@example.com"]
-    assert "Hi Ada Lovelace" in str(mail.outbox[0].body)
+    assert mail.outbox[0].subject == "Willkommen bei DABubble"
+    assert "Hallo Ada Lovelace" in str(mail.outbox[0].body)

@@ -1,10 +1,10 @@
-{% autoescape off %}Hi {{ user.full_name }},
+{% autoescape off %}Hallo {{ user.full_name }},
 
-please confirm your email address to activate your DABubble account:
+bitte bestätige deine E-Mail-Adresse, um dein DABubble-Konto zu aktivieren:
 
 {{ verify_url }}
 
-The link is valid for {{ valid_days }} days. If you didn't sign up for DABubble, you can ignore this email.
+Der Link ist {{ valid_days }} Tag{{ valid_days|pluralize:"e" }} gültig. Falls du dich nicht bei DABubble registriert hast, kannst du diese E-Mail ignorieren.
 
-— The DABubble team
+— Dein DABubble-Team
 {% endautoescape %}
