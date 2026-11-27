@@ -1,7 +1,7 @@
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import UploadedFile
 from django.core.validators import FileExtensionValidator
@@ -17,18 +17,18 @@ class UserSerializer(serializers.ModelSerializer[User]):
         read_only_fields = ("id", "email", "avatar", "default_avatar", "date_joined")
 
 
-class RegisterSerializer(serializers.Serializer[dict[str, Any]]):
-    """Sign-up data. Send `avatar` (an image file) or `default_avatar`, not both."""
+class RegisterDetailsSerializer(serializers.Serializer[dict[str, Any]]):
+    """The first sign-up step: name, email, password and privacy policy. No avatar yet.
+
+    Used on its own to check the first step before the user picks an avatar, and as the base of
+    `RegisterSerializer`, so both steps follow exactly the same rules.
+    """
 
     full_name = serializers.CharField(max_length=150)
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(
         write_only=True, trim_whitespace=False, style={"input_type": "password"}
     )
-    avatar = serializers.ImageField(
-        required=False, validators=[FileExtensionValidator(AVATAR_EXTENSIONS)]
-    )
-    default_avatar = serializers.ChoiceField(choices=DefaultAvatar.choices, required=False)
     accept_privacy_policy = serializers.BooleanField(
         write_only=True, help_text="Must be `true`: the user has read the privacy policy."
     )
@@ -39,6 +39,40 @@ class RegisterSerializer(serializers.Serializer[dict[str, Any]]):
             raise serializers.ValidationError("Diese E-Mail-Adresse wird bereits verwendet.")
         return email
 
+    def validate_accept_privacy_policy(self, value: bool) -> bool:
+        if value is not True:
+            raise serializers.ValidationError(
+                "Bitte bestätige, dass du die Datenschutzerklärung gelesen hast."
+            )
+        return value
+
+    def validate_password(self, value: str) -> str:
+        """Run Django's password validators, including "too similar to name/email".
+
+        This is a field check (not part of `validate`), so its errors come back together with the
+        other field errors instead of only after they are fixed. Name and email are therefore
+        taken as typed, before their own validation; that's fine for a similarity check.
+        """
+        raw = self.initial_data
+        unsaved_user = User(
+            email=raw.get("email") if isinstance(raw.get("email"), str) else "",
+            full_name=raw.get("full_name") if isinstance(raw.get("full_name"), str) else "",
+        )
+        try:
+            password_validation.validate_password(value, user=unsaved_user)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(list(error.messages)) from error
+        return value
+
+
+class RegisterSerializer(RegisterDetailsSerializer):
+    """Sign-up data. Send `avatar` (an image file) or `default_avatar`, not both."""
+
+    avatar = serializers.ImageField(
+        required=False, validators=[FileExtensionValidator(AVATAR_EXTENSIONS)]
+    )
+    default_avatar = serializers.ChoiceField(choices=DefaultAvatar.choices, required=False)
+
     def validate_avatar(self, value: UploadedFile[bytes]) -> UploadedFile[bytes]:
         max_size: int = settings.AVATAR_MAX_UPLOAD_SIZE
         if value.size is not None and value.size > max_size:
@@ -47,24 +81,11 @@ class RegisterSerializer(serializers.Serializer[dict[str, Any]]):
             )
         return value
 
-    def validate_accept_privacy_policy(self, value: bool) -> bool:
-        if value is not True:
-            raise serializers.ValidationError(
-                "Bitte bestätige, dass du die Datenschutzerklärung gelesen hast."
-            )
-        return value
-
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if bool(attrs.get("avatar")) == bool(attrs.get("default_avatar")):
             raise serializers.ValidationError(
                 {"avatar": "Lade ein eigenes Profilbild hoch oder wähle einen Standard-Avatar."}
             )
-        # Run Django's password validators, including "too similar to name/email".
-        unsaved_user = User(email=attrs["email"], full_name=attrs["full_name"])
-        try:
-            validate_password(attrs["password"], user=unsaved_user)
-        except DjangoValidationError as error:
-            raise serializers.ValidationError({"password": list(error.messages)}) from error
         return attrs
 
 

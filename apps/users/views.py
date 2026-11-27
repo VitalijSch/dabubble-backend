@@ -7,7 +7,12 @@ from rest_framework.views import APIView
 
 from . import services
 from .models import User
-from .serializers import RegisterSerializer, UserSerializer, VerifyEmailSerializer
+from .serializers import (
+    RegisterDetailsSerializer,
+    RegisterSerializer,
+    UserSerializer,
+    VerifyEmailSerializer,
+)
 
 
 class MeView(generics.RetrieveAPIView[User]):
@@ -38,6 +43,30 @@ class RegisterView(APIView):
             UserSerializer(user, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class RegisterValidateView(APIView):
+    """Check the first sign-up step (name, email, password, privacy policy) without saving.
+
+    The frontend calls this on "Weiter", before the avatar step, so the user sees problems like
+    "email already in use" right away. `register` checks everything again: this is only a preview.
+    """
+
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "register_validate"
+
+    @extend_schema(
+        request=RegisterDetailsSerializer,
+        responses={
+            204: OpenApiResponse(description="The details are valid; continue to the avatar step."),
+            400: OpenApiResponse(description="Field errors, in the same format as `register`."),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        RegisterDetailsSerializer(data=request.data).is_valid(raise_exception=True)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class VerifyEmailView(APIView):
