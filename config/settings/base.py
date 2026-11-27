@@ -86,7 +86,7 @@ PASSWORD_HASHERS = [
 ]
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": "apps.users.password_validation.GermanUserAttributeSimilarityValidator",
         "OPTIONS": {"user_attributes": ("email", "full_name")},
     },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

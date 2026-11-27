@@ -310,7 +310,14 @@ def test_validate_rejects_password_similar_to_name() -> None:
     response = validate_details(details(full_name="Lovelace Augusta", password="lovelaceaugusta"))
 
     assert response.status_code == 400
-    assert "password" in response.json()
+    assert "Das Passwort ist deinem Namen zu ähnlich." in response.json()["password"]
+
+
+def test_validate_rejects_password_similar_to_email_in_german() -> None:
+    response = validate_details(details(email="ada@example.com", password="adaexample"))
+
+    assert response.status_code == 400
+    assert "Das Passwort ist deiner E-Mail-Adresse zu ähnlich." in response.json()["password"]
 
 
 @pytest.mark.parametrize("value", [None, False])
