@@ -45,6 +45,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.EnglishAdminMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -94,7 +95,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # All texts users see are German, including Django's and DRF's built-in messages.
-# Code, comments and developer-facing messages stay English.
+# Code, comments and developer-facing messages stay English, and so does the admin
+# (see apps.core.middleware.EnglishAdminMiddleware).
 LANGUAGE_CODE = "de"
 TIME_ZONE = "UTC"
 USE_I18N = True
