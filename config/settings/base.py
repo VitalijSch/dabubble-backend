@@ -112,6 +112,10 @@ STORAGES: dict[str, dict[str, Any]] = {
 # Largest avatar image a user can upload.
 AVATAR_MAX_UPLOAD_SIZE = 2 * 1024 * 1024  # 2 MB
 
+# Version of the privacy policy the frontend currently shows. Stored with each new user as proof
+# of which text they accepted. Change it whenever the policy text changes.
+PRIVACY_POLICY_VERSION = env("PRIVACY_POLICY_VERSION", default="2026-11-27")
+
 ADMIN_URL = env("DJANGO_ADMIN_URL", default="admin/")
 
 # --- Email (Django 6.1 MAILERS; replaces EMAIL_BACKEND / EMAIL_* settings) ----------------------

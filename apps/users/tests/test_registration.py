@@ -8,6 +8,7 @@ import pytest
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APIClient
 
@@ -34,6 +35,7 @@ def payload(**overrides: Any) -> dict[str, Any]:
         "email": "ada@example.com",
         "password": STRONG_PASSWORD,
         "default_avatar": DefaultAvatar.AVATAR_3,
+        "accept_privacy_policy": True,
     }
     data.update(overrides)
     return {key: value for key, value in data.items() if value is not None}
@@ -207,6 +209,37 @@ def test_register_rejects_password_similar_to_name(
 
     assert response.status_code == 400
     assert "password" in response.json()
+
+
+@pytest.mark.parametrize("fmt", ["json", "multipart"])
+@pytest.mark.parametrize("value", [None, False])
+def test_register_requires_privacy_policy_acceptance(
+    django_capture_on_commit_callbacks: CaptureOnCommit, fmt: str, value: bool | None
+) -> None:
+    response = register(
+        django_capture_on_commit_callbacks, payload(accept_privacy_policy=value), fmt=fmt
+    )
+
+    assert response.status_code == 400
+    assert "accept_privacy_policy" in response.json()
+    assert not User.objects.exists()
+    assert mail.outbox == []
+
+
+def test_register_records_privacy_policy_acceptance(
+    django_capture_on_commit_callbacks: CaptureOnCommit, settings: Any
+) -> None:
+    settings.PRIVACY_POLICY_VERSION = "2026-11-27"
+    before = timezone.now()
+
+    response = register(django_capture_on_commit_callbacks, payload())
+
+    assert response.status_code == 201, response.json()
+    assert "accept_privacy_policy" not in response.json()
+    user = User.objects.get(email="ada@example.com")
+    assert user.privacy_policy_version == "2026-11-27"
+    assert user.privacy_policy_accepted_at is not None
+    assert before <= user.privacy_policy_accepted_at <= timezone.now()
 
 
 # --- Email verification -------------------------------------------------------------------------

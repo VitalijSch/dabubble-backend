@@ -82,6 +82,12 @@ class User(AbstractUser):
     default_avatar = models.CharField(max_length=20, choices=DefaultAvatar.choices, blank=True)
     # Set when the user opens the link in the confirmation email.
     email_verified_at = models.DateTimeField("email verified at", null=True, blank=True)
+    # Proof that the user saw the privacy policy at sign-up (GDPR accountability, Art. 5(2)).
+    # Empty for users created outside the sign-up API (createsuperuser, shell, old accounts).
+    privacy_policy_accepted_at = models.DateTimeField(
+        "privacy policy accepted at", null=True, blank=True
+    )
+    privacy_policy_version = models.CharField("privacy policy version", max_length=32, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: ClassVar[list[str]] = ["full_name"]

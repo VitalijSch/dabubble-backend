@@ -29,6 +29,9 @@ class RegisterSerializer(serializers.Serializer[dict[str, Any]]):
         required=False, validators=[FileExtensionValidator(AVATAR_EXTENSIONS)]
     )
     default_avatar = serializers.ChoiceField(choices=DefaultAvatar.choices, required=False)
+    accept_privacy_policy = serializers.BooleanField(
+        write_only=True, help_text="Must be `true`: the user has read the privacy policy."
+    )
 
     def validate_email(self, value: str) -> str:
         email = value.strip().lower()
@@ -42,6 +45,11 @@ class RegisterSerializer(serializers.Serializer[dict[str, Any]]):
             raise serializers.ValidationError(
                 f"The image is too large (max {max_size // (1024 * 1024)} MB)."
             )
+        return value
+
+    def validate_accept_privacy_policy(self, value: bool) -> bool:
+        if value is not True:
+            raise serializers.ValidationError("You must accept the privacy policy.")
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

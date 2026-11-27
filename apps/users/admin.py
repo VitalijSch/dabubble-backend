@@ -24,7 +24,13 @@ class UserAdmin(BaseUserAdmin[User]):
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},
         ),
         (_("Important dates"), {"fields": ("last_login", "date_joined", "email_verified_at")}),
+        (
+            _("Privacy policy"),
+            {"fields": ("privacy_policy_accepted_at", "privacy_policy_version")},
+        ),
     )
+    # Evidence of what the user accepted; nobody should edit it by hand.
+    readonly_fields = ("privacy_policy_accepted_at", "privacy_policy_version")
     add_fieldsets = (
         (
             None,
