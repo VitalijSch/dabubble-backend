@@ -175,6 +175,12 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "REST API for the DABubble frontend.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # Separate request/response components (e.g. `RegisterRequest` vs `User`): read-only fields
+    # aren't asked for in requests, and file uploads are typed as binary. Needed for good
+    # generated TypeScript types in the frontend.
+    "COMPONENT_SPLIT_REQUEST": True,
+    # Group endpoints by feature ("auth", "me") instead of putting everything under "v1".
+    "SCHEMA_PATH_PREFIX": r"/api/v[0-9]+",
 }
 # Serve /api/schema/ and /api/docs/ (on by default only in local settings).
 API_DOCS_ENABLED = env.bool("DJANGO_API_DOCS_ENABLED", default=False)

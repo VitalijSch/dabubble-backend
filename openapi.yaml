@@ -1,0 +1,368 @@
+openapi: 3.0.3
+info:
+  title: DABubble API
+  version: 1.0.0
+  description: REST API for the DABubble frontend.
+paths:
+  /api/v1/auth/register/:
+    post:
+      operationId: auth_register_create
+      description: Create an account. The user must confirm their email before they
+        can log in.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: Account created; a confirmation email is on its way.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterValidationError'
+          description: The data is invalid. Messages per field, ready to show under
+            the inputs.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: Too many requests. Try again later.
+  /api/v1/auth/register/validate/:
+    post:
+      operationId: auth_register_validate_create
+      description: |-
+        Check the first sign-up step (name, email, password, privacy policy) without saving.
+
+        The frontend calls this on "Weiter", before the avatar step, so the user sees problems like
+        "email already in use" right away. `register` checks everything again: this is only a preview.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterDetailsRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '204':
+          description: The details are valid; continue to the avatar step.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterDetailsValidationError'
+          description: The data is invalid. Messages per field, ready to show under
+            the inputs.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: Too many requests. Try again later.
+  /api/v1/auth/verify-email/:
+    post:
+      operationId: auth_verify_email_create
+      description: Confirm the email address with the `uid` and `token` from the email
+        link.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '204':
+          description: Email confirmed; the account is active.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEmailError'
+          description: '`uid`/`token` missing (field errors) or the link is invalid,
+            expired or already used (`detail`).'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: Too many requests. Try again later.
+  /api/v1/me/:
+    get:
+      operationId: me_retrieve
+      description: The currently logged-in user.
+      tags:
+      - me
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+          description: Not logged in.
+components:
+  schemas:
+    BlankEnum:
+      enum:
+      - ''
+    DefaultAvatarEnum:
+      enum:
+      - avatar_1
+      - avatar_2
+      - avatar_3
+      - avatar_4
+      - avatar_5
+      - avatar_6
+      type: string
+      description: |-
+        * `avatar_1` - Avatar 1
+        * `avatar_2` - Avatar 2
+        * `avatar_3` - Avatar 3
+        * `avatar_4` - Avatar 4
+        * `avatar_5` - Avatar 5
+        * `avatar_6` - Avatar 6
+    ErrorDetail:
+      type: object
+      description: A single error message, e.g. "not logged in" or "too many requests".
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    RegisterDetailsRequest:
+      type: object
+      description: |-
+        The first sign-up step: name, email, password and privacy policy. No avatar yet.
+
+        Used on its own to check the first step before the user picks an avatar, and as the base of
+        `RegisterSerializer`, so both steps follow exactly the same rules.
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        accept_privacy_policy:
+          type: boolean
+          writeOnly: true
+          description: 'Must be `true`: the user has read the privacy policy.'
+      required:
+      - accept_privacy_policy
+      - email
+      - full_name
+      - password
+    RegisterDetailsValidationError:
+      type: object
+      description: 'Field errors: one or more German messages per invalid field (RegisterDetails).'
+      properties:
+        full_name:
+          type: array
+          items:
+            type: string
+        email:
+          type: array
+          items:
+            type: string
+        password:
+          type: array
+          items:
+            type: string
+        accept_privacy_policy:
+          type: array
+          items:
+            type: string
+        non_field_errors:
+          type: array
+          items:
+            type: string
+    RegisterRequest:
+      type: object
+      description: Sign-up data. Send `avatar` (an image file) or `default_avatar`,
+        not both.
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        accept_privacy_policy:
+          type: boolean
+          writeOnly: true
+          description: 'Must be `true`: the user has read the privacy policy.'
+        avatar:
+          type: string
+          format: binary
+          pattern: (?:jpg|jpeg|png|webp)$
+        default_avatar:
+          $ref: '#/components/schemas/DefaultAvatarEnum'
+      required:
+      - accept_privacy_policy
+      - email
+      - full_name
+      - password
+    RegisterValidationError:
+      type: object
+      description: 'Field errors: one or more German messages per invalid field (Register).'
+      properties:
+        full_name:
+          type: array
+          items:
+            type: string
+        email:
+          type: array
+          items:
+            type: string
+        password:
+          type: array
+          items:
+            type: string
+        accept_privacy_policy:
+          type: array
+          items:
+            type: string
+        avatar:
+          type: array
+          items:
+            type: string
+        default_avatar:
+          type: array
+          items:
+            type: string
+        non_field_errors:
+          type: array
+          items:
+            type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Email address
+        full_name:
+          type: string
+          maxLength: 150
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        default_avatar:
+          readOnly: true
+          oneOf:
+          - $ref: '#/components/schemas/DefaultAvatarEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Mitglied seit
+      required:
+      - avatar
+      - date_joined
+      - default_avatar
+      - email
+      - full_name
+      - id
+    VerifyEmailError:
+      oneOf:
+      - $ref: '#/components/schemas/VerifyEmailValidationError'
+      - $ref: '#/components/schemas/ErrorDetail'
+    VerifyEmailRequest:
+      type: object
+      properties:
+        uid:
+          type: string
+          minLength: 1
+          maxLength: 64
+        token:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - token
+      - uid
+    VerifyEmailValidationError:
+      type: object
+      description: 'Field errors: one or more German messages per invalid field (VerifyEmail).'
+      properties:
+        uid:
+          type: array
+          items:
+            type: string
+        token:
+          type: array
+          items:
+            type: string
+        non_field_errors:
+          type: array
+          items:
+            type: string
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

@@ -1,4 +1,4 @@
-.PHONY: install db dev worker migrate test lint format typecheck check
+.PHONY: install db dev worker migrate test lint format typecheck schema check
 
 install:   ; uv sync
 db:        ; docker compose up -d --wait db redis
@@ -9,6 +9,8 @@ test:      ; uv run pytest --cov
 lint:      ; uv run ruff check .
 format:    ; uv run ruff format . && uv run ruff check --fix .
 typecheck: ; uv run mypy .
+# The API contract for the frontend. Run after changing endpoints or serializers, then commit it.
+schema:    ; uv run python manage.py spectacular --validate --fail-on-warn --file openapi.yaml
 
 check:
 	uv run ruff format --check .
