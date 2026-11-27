@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APIClient
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.users.models import DefaultAvatar, User
 
@@ -203,6 +204,17 @@ def test_register_rejects_weak_password(
     assert "password" in response.json()
 
 
+def test_register_reports_password_error_together_with_other_errors(
+    django_capture_on_commit_callbacks: CaptureOnCommit,
+) -> None:
+    UserFactory.create(email="ada@example.com")
+
+    response = register(django_capture_on_commit_callbacks, payload(password="12345678"))
+
+    assert response.status_code == 400
+    assert {"email", "password"} <= response.json().keys()
+
+
 def test_register_rejects_password_similar_to_name(
     django_capture_on_commit_callbacks: CaptureOnCommit,
 ) -> None:
@@ -254,6 +266,101 @@ def test_register_records_privacy_policy_acceptance(
     assert user.privacy_policy_version == "2026-11-27"
     assert user.privacy_policy_accepted_at is not None
     assert before <= user.privacy_policy_accepted_at <= timezone.now()
+
+
+# --- Step 1 validation (before the avatar step) -------------------------------------------------
+
+
+def details(**overrides: Any) -> dict[str, Any]:
+    """The fields of the first sign-up step: everything except the avatar."""
+    data = payload(**overrides)
+    data.pop("default_avatar", None)
+    return data
+
+
+def validate_details(data: dict[str, Any]) -> Any:
+    return APIClient().post(reverse("users:register-validate"), data, format="json")
+
+
+def test_validate_accepts_valid_details_without_creating_a_user() -> None:
+    response = validate_details(details())
+
+    assert response.status_code == 204
+    assert not User.objects.exists()
+    assert mail.outbox == []
+
+
+def test_validate_rejects_taken_email_in_german() -> None:
+    UserFactory.create(email="ada@example.com")
+
+    response = validate_details(details(email="ADA@example.com"))
+
+    assert response.status_code == 400
+    assert response.json()["email"] == ["Diese E-Mail-Adresse wird bereits verwendet."]
+
+
+def test_validate_rejects_weak_password() -> None:
+    response = validate_details(details(password="12345678"))
+
+    assert response.status_code == 400
+    assert "password" in response.json()
+
+
+def test_validate_rejects_password_similar_to_name() -> None:
+    response = validate_details(details(full_name="Lovelace Augusta", password="lovelaceaugusta"))
+
+    assert response.status_code == 400
+    assert "password" in response.json()
+
+
+@pytest.mark.parametrize("value", [None, False])
+def test_validate_requires_privacy_policy_acceptance(value: bool | None) -> None:
+    response = validate_details(details(accept_privacy_policy=value))
+
+    assert response.status_code == 400
+    assert "accept_privacy_policy" in response.json()
+
+
+@pytest.mark.parametrize("field", ["full_name", "email", "password"])
+def test_validate_requires_field(field: str) -> None:
+    response = validate_details(details(**{field: None}))
+
+    assert response.status_code == 400
+    assert field in response.json()
+
+
+def test_validate_reports_all_field_errors_at_once() -> None:
+    UserFactory.create(email="ada@example.com")
+
+    response = validate_details(details(password="12345678", accept_privacy_policy=False))
+
+    assert response.status_code == 400
+    assert {"email", "password", "accept_privacy_policy"} <= response.json().keys()
+
+
+def test_validate_checks_password_even_when_name_is_missing() -> None:
+    response = validate_details(details(full_name=None, password="12345678"))
+
+    assert response.status_code == 400
+    assert {"full_name", "password"} <= response.json().keys()
+
+
+def test_validate_checks_password_similarity_against_raw_input() -> None:
+    """The name is compared as typed, even when another field (here the email) is invalid."""
+    response = validate_details(
+        details(email="not-an-email", full_name="Lovelace Augusta", password="lovelaceaugusta")
+    )
+
+    assert response.status_code == 400
+    assert {"email", "password"} <= response.json().keys()
+
+
+def test_validate_is_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ScopedRateThrottle, "THROTTLE_RATES", {"register_validate": "2/hour"})
+
+    statuses = [validate_details(details()).status_code for _ in range(3)]
+
+    assert statuses == [204, 204, 429]
 
 
 # --- Email verification -------------------------------------------------------------------------

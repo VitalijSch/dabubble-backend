@@ -162,7 +162,12 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     # Rates for views that set `throttle_scope` (sign-up and email confirmation are public).
-    "DEFAULT_THROTTLE_RATES": {"register": "10/hour", "verify_email": "30/hour"},
+    "DEFAULT_THROTTLE_RATES": {
+        "register": "10/hour",
+        # Higher than "register": users may fix a typo a few times on the first step.
+        "register_validate": "30/hour",
+        "verify_email": "30/hour",
+    },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 SPECTACULAR_SETTINGS = {
