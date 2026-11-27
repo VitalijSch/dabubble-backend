@@ -1,9 +1,16 @@
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, permissions, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+
+from apps.core.openapi import (
+    NOT_LOGGED_IN,
+    RATE_LIMITED,
+    validation_error_response,
+    validation_or_detail_error_response,
+)
 
 from . import services
 from .models import User
@@ -15,6 +22,7 @@ from .serializers import (
 )
 
 
+@extend_schema_view(get=extend_schema(responses={200: UserSerializer, 403: NOT_LOGGED_IN}))
 class MeView(generics.RetrieveAPIView[User]):
     """The currently logged-in user."""
 
@@ -34,7 +42,17 @@ class RegisterView(APIView):
     throttle_classes = (ScopedRateThrottle,)
     throttle_scope = "register"
 
-    @extend_schema(request=RegisterSerializer, responses={201: UserSerializer})
+    @extend_schema(
+        request=RegisterSerializer,
+        responses={
+            201: OpenApiResponse(
+                response=UserSerializer,
+                description="Account created; a confirmation email is on its way.",
+            ),
+            400: validation_error_response(RegisterSerializer),
+            429: RATE_LIMITED,
+        },
+    )
     def post(self, request: Request) -> Response:
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -61,7 +79,8 @@ class RegisterValidateView(APIView):
         request=RegisterDetailsSerializer,
         responses={
             204: OpenApiResponse(description="The details are valid; continue to the avatar step."),
-            400: OpenApiResponse(description="Field errors, in the same format as `register`."),
+            400: validation_error_response(RegisterDetailsSerializer),
+            429: RATE_LIMITED,
         },
     )
     def post(self, request: Request) -> Response:
@@ -81,7 +100,13 @@ class VerifyEmailView(APIView):
         request=VerifyEmailSerializer,
         responses={
             204: OpenApiResponse(description="Email confirmed; the account is active."),
-            400: OpenApiResponse(description="The link is invalid, expired or already used."),
+            400: validation_or_detail_error_response(
+                VerifyEmailSerializer,
+                component_name="VerifyEmailError",
+                description="`uid`/`token` missing (field errors) or the link is invalid, expired "
+                "or already used (`detail`).",
+            ),
+            429: RATE_LIMITED,
         },
     )
     def post(self, request: Request) -> Response:

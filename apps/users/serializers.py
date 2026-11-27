@@ -11,6 +11,11 @@ from .models import AVATAR_EXTENSIONS, DefaultAvatar, User
 
 
 class UserSerializer(serializers.ModelSerializer[User]):
+    # Declared so the schema says what the API really sends: "" when the user uploaded an avatar.
+    default_avatar = serializers.ChoiceField(
+        choices=DefaultAvatar.choices, allow_blank=True, read_only=True
+    )
+
     class Meta:
         model = User
         fields = ("id", "email", "full_name", "avatar", "default_avatar", "date_joined")

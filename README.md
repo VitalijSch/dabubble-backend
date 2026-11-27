@@ -69,8 +69,10 @@ static/             project static files
 ## Frontend integration
 
 - **Auth:** DRF session authentication. The frontend sends requests with `credentials: "include"`, and for unsafe methods it sends the `X-CSRFToken` header from the `csrftoken` cookie. Allowed frontend origins are set in `DJANGO_CORS_ALLOWED_ORIGINS`, `DJANGO_CSRF_TRUSTED_ORIGINS` and `DJANGO_WEBSOCKET_ALLOWED_ORIGINS`.
-- **TypeScript types:** generate them from the schema while the backend runs locally, for example
-  `pnpm dlx openapi-typescript http://localhost:8000/api/schema/ -o src/lib/api/schema.d.ts`.
+- **API contract:** [`openapi.yaml`](openapi.yaml) describes every endpoint: request fields, responses and error bodies. It's generated from the code with `make schema` and committed, so every API change shows up in the pull request diff. A test fails when it's out of date.
+- **Browse it:** http://localhost:8000/api/docs/ (Swagger UI, local only) lists every endpoint and lets you try it.
+- **TypeScript types:** the frontend generates its types from `openapi.yaml` (see the frontend README); never write API types by hand.
+- **Errors:** `400` returns messages per field, `{"email": ["…"], "non_field_errors": ["…"]}`. Other errors (`403` not logged in, `429` too many requests) return `{"detail": "…"}`. All messages are German and ready to show.
 - **WebSockets:** connect to `/ws/...`. The session cookie authenticates the user. In production, serve frontend and API under the same site (for example `app.example.com` and `api.example.com`) so the cookie is sent.
 
 ## Deployment (company VM)
