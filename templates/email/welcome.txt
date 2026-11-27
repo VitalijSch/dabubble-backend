@@ -1,6 +1,6 @@
-{% autoescape off %}Hi {{ user.full_name }},
+{% autoescape off %}Hallo {{ user.full_name }},
 
-welcome to DABubble! Your account for {{ user.email }} is ready.
+willkommen bei DABubble! Dein Konto für {{ user.email }} ist bereit.
 
-— The DABubble team
+— Dein DABubble-Team
 {% endautoescape %}

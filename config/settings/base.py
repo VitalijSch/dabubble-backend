@@ -93,7 +93,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-LANGUAGE_CODE = "en-us"
+# All texts users see are German, including Django's and DRF's built-in messages.
+# Code, comments and developer-facing messages stay English.
+LANGUAGE_CODE = "de"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True

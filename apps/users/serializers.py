@@ -36,26 +36,28 @@ class RegisterSerializer(serializers.Serializer[dict[str, Any]]):
     def validate_email(self, value: str) -> str:
         email = value.strip().lower()
         if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
+            raise serializers.ValidationError("Diese E-Mail-Adresse wird bereits verwendet.")
         return email
 
     def validate_avatar(self, value: UploadedFile[bytes]) -> UploadedFile[bytes]:
         max_size: int = settings.AVATAR_MAX_UPLOAD_SIZE
         if value.size is not None and value.size > max_size:
             raise serializers.ValidationError(
-                f"The image is too large (max {max_size // (1024 * 1024)} MB)."
+                f"Das Bild ist zu groß (max. {max_size // (1024 * 1024)} MB)."
             )
         return value
 
     def validate_accept_privacy_policy(self, value: bool) -> bool:
         if value is not True:
-            raise serializers.ValidationError("You must accept the privacy policy.")
+            raise serializers.ValidationError(
+                "Bitte bestätige, dass du die Datenschutzerklärung gelesen hast."
+            )
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if bool(attrs.get("avatar")) == bool(attrs.get("default_avatar")):
             raise serializers.ValidationError(
-                {"avatar": "Upload an avatar or choose a default one, not both."}
+                {"avatar": "Lade ein eigenes Profilbild hoch oder wähle einen Standard-Avatar."}
             )
         # Run Django's password validators, including "too similar to name/email".
         unsaved_user = User(email=attrs["email"], full_name=attrs["full_name"])

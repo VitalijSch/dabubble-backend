@@ -99,7 +99,10 @@ def test_register_sends_verification_email(
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["ada@example.com"]
-    assert "https://app.example.com/verify-email?uid=" in str(mail.outbox[0].body)
+    assert mail.outbox[0].subject == "Bestätige deine E-Mail-Adresse für DABubble"
+    body = str(mail.outbox[0].body)
+    assert body.startswith("Hallo Ada Lovelace,")
+    assert "https://app.example.com/verify-email?uid=" in body
 
 
 def test_register_normalises_email(django_capture_on_commit_callbacks: CaptureOnCommit) -> None:
@@ -116,7 +119,8 @@ def test_register_requires_field(
     response = register(django_capture_on_commit_callbacks, payload(**{missing: None}))
 
     assert response.status_code == 400
-    assert missing in response.json()
+    # Built-in DRF message, so this also proves LANGUAGE_CODE is German.
+    assert response.json()[missing] == ["Dieses Feld ist zwingend erforderlich."]
     assert not User.objects.exists()
     assert mail.outbox == []
 
@@ -226,6 +230,16 @@ def test_register_requires_privacy_policy_acceptance(
     assert mail.outbox == []
 
 
+def test_register_explains_privacy_policy_error_in_german(
+    django_capture_on_commit_callbacks: CaptureOnCommit,
+) -> None:
+    response = register(django_capture_on_commit_callbacks, payload(accept_privacy_policy=False))
+
+    assert response.json()["accept_privacy_policy"] == [
+        "Bitte bestätige, dass du die Datenschutzerklärung gelesen hast."
+    ]
+
+
 def test_register_records_privacy_policy_acceptance(
     django_capture_on_commit_callbacks: CaptureOnCommit, settings: Any
 ) -> None:
@@ -266,6 +280,9 @@ def test_verify_email_link_works_only_once(
     response = APIClient().post(reverse("users:verify-email"), params, format="json")
 
     assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Dieser Link ist ungültig, abgelaufen oder wurde bereits verwendet."
+    }
 
 
 def test_verify_email_link_stops_working_after_deactivation(
