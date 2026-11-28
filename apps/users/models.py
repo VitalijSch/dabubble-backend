@@ -13,6 +13,7 @@ AVATAR_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
 class DefaultAvatar(models.TextChoices):
     """Built-in avatars a user can pick instead of uploading one. The frontend has the images."""
 
+    AVATAR_0 = "avatar_0", "Avatar 0"  # the neutral placeholder; default when none was picked
     AVATAR_1 = "avatar_1", "Avatar 1"
     AVATAR_2 = "avatar_2", "Avatar 2"
     AVATAR_3 = "avatar_3", "Avatar 3"
@@ -36,7 +37,7 @@ class EmailUserManager(UserManager["User"]):
             raise ValueError("Users must have an email address.")
         if not extra_fields.get("avatar"):
             # Users created outside the API (createsuperuser, shell) get a built-in avatar.
-            extra_fields.setdefault("default_avatar", DefaultAvatar.AVATAR_1)
+            extra_fields.setdefault("default_avatar", DefaultAvatar.AVATAR_0)
         user = self.model(email=self.normalize_email(email).lower(), **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
