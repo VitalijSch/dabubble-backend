@@ -64,4 +64,9 @@ def test_clean_reports_missing_avatar() -> None:
 
 def test_create_superuser_gets_default_avatar() -> None:
     admin = User.objects.create_superuser(email="root@example.com", password="s3cret-pass")
-    assert admin.default_avatar == DefaultAvatar.AVATAR_1
+    assert admin.default_avatar == DefaultAvatar.AVATAR_0
+
+
+def test_create_user_without_avatar_gets_placeholder_avatar() -> None:
+    user = User.objects.create_user(email="ada@example.com", password="s3cret-pass")
+    assert user.default_avatar == "avatar_0"

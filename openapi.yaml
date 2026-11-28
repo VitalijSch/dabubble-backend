@@ -150,6 +150,7 @@ components:
       - ''
     DefaultAvatarEnum:
       enum:
+      - avatar_0
       - avatar_1
       - avatar_2
       - avatar_3
@@ -158,6 +159,7 @@ components:
       - avatar_6
       type: string
       description: |-
+        * `avatar_0` - Avatar 0
         * `avatar_1` - Avatar 1
         * `avatar_2` - Avatar 2
         * `avatar_3` - Avatar 3
