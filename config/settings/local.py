@@ -12,8 +12,10 @@ MIDDLEWARE.insert(
 )
 INTERNAL_IPS = ["127.0.0.1"]
 
-# Print emails to the terminal instead of sending them.
-MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
+# Print emails to the terminal instead of sending them, unless DJANGO_LOCAL_SEND_EMAIL is on:
+# then the SMTP mailer from base.py (DJANGO_EMAIL_* variables) sends them for real.
+if not env.bool("DJANGO_LOCAL_SEND_EMAIL", default=False):
+    MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
 
 API_DOCS_ENABLED = True
 
